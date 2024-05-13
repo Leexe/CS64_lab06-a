@@ -153,7 +153,6 @@ conv2d:
 
             addiu $s5 $s5 1
             j conv2d_initArray
-            
         conv2d_afterInitArray:
             li $s5 0
 
@@ -164,16 +163,22 @@ conv2d:
             add $t0 $s4 $s5
             mult $t0 $a1
             mflo $t0
+            mult $t0 $s6
+            mflo $t0
             addu $t0 $t0 $a2
 
             # $t1 = &filt[j * 3]
             li $t1 3
             mult $s5 $t1
             mflo $t1
+            mult $t1 $s6
+            mflo $t1
             addu $t1 $t1 $a3
 
             # $t2 = &output[i * out_width]
             mult $s4 $s3 
+            mflo $t2
+            mult $t2 $s6
             mflo $t2
             addu $t2 $t2 $s7
 
@@ -196,7 +201,6 @@ conv2d:
 
             addiu $s5 $s5 1
             j conv2d_innerArray
-
         conv2d_afterLoop:
             addiu $s4 $s4 1
             j conv2d_loop
