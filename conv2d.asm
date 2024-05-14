@@ -22,10 +22,6 @@ filter:
     # 1 1 1
     # 2 2 2
     # 3 3 3
-output: 
-	.word 0 0 0 0 0 0
-output_length:
-	.word 6
 ack: .asciiz "\n"
 space: .asciiz " "
 
@@ -98,7 +94,7 @@ conv:
 
 
 conv2d:
-    addiu $sp $sp -72
+    addiu $sp $sp -56
     sw $s0 16($sp)
     sw $s1 20($sp)
     sw $s2 24($sp)
@@ -108,8 +104,6 @@ conv2d:
     sw $s6 40($sp)
     sw $s7 44($sp)
     sw $ra 48($sp)
-    # Padding at 52($sp)
-    # Local Data at 56-68($sp)
 
     # $s0 = filter_height
     # $s1 = filter_width
@@ -133,7 +127,15 @@ conv2d:
     ble $s2 $0 conv2d_return
     ble $s3 $0 conv2d_return
 
-    la $s7 output
+    mult $s2 $s3
+    mflo $s7
+    mult $s7 $s6
+    mflo $s7
+    sub $sp $sp $s7
+    addiu $sp $sp -4
+    sw $s7 0($sp)
+    move $s7 $sp
+    addiu $s7 $s7 4
 
     li $s4 0
     conv2d_loop:
@@ -183,21 +185,23 @@ conv2d:
             addu $t2 $t2 $s7
 
             # $t3 = out_width
-            move $t3 $s3
+            move $t3 $s3   
 
-            sw $a0 56($sp)
-            sw $a1 60($sp)
-            sw $a2 64($sp)
-            sw $a3 68($sp)
+            addiu $sp $sp -16
+            sw $a0 0($sp)
+            sw $a1 4($sp)
+            sw $a2 8($sp)
+            sw $a3 12($sp)
             move $a0 $t0
             move $a1 $t1
             move $a2 $t2
             move $a3 $t3
             jal conv
-            lw $a0 56($sp)
-            lw $a1 60($sp)
-            lw $a2 64($sp)
-            lw $a3 68($sp)
+            lw $a0 0($sp)
+            lw $a1 4($sp)
+            lw $a2 8($sp)
+            lw $a3 12($sp)
+            addiu $sp $sp 16
 
             addiu $s5 $s5 1
             j conv2d_innerArray
@@ -227,6 +231,9 @@ conv2d:
             j conv2d_printLoop
 
     conv2d_return: 
+        lw $t0 0($sp)
+        addiu $sp $sp 4
+        addu $sp $sp $t0
         lw $s0 16($sp)
         lw $s1 20($sp)
         lw $s2 24($sp)
@@ -236,16 +243,8 @@ conv2d:
         lw $s6 40($sp)
         lw $s7 44($sp)
         lw $ra 48($sp)
-        addiu $sp $sp 72
+        addiu $sp $sp 56
         jr $ra
-
-print:
-    li $v0 1
-    syscall
-    li $v0 11
-    li $a0 10
-    syscall
-    jr $ra
 
 main:
     #Do not modify anything past here!
@@ -292,3 +291,4 @@ exit:
     syscall
 	li $v0 10 
 	syscall
+
