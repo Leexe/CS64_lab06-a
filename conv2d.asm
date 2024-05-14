@@ -94,6 +94,11 @@ conv:
 
 
 conv2d:
+    addiu $sp $sp -16
+    sw $a0 0($sp)
+    sw $a1 4($sp)
+    sw $a2 8($sp)
+    sw $a3 12($sp)
     addiu $sp $sp -56
     sw $s0 16($sp)
     sw $s1 20($sp)
@@ -105,135 +110,159 @@ conv2d:
     sw $s7 44($sp)
     sw $ra 48($sp)
 
-    # $s0 = filter_height
-    # $s1 = filter_width
+    # $a0 -> inp_height
+    # $a1 -> inp_width
+    # $a2 -> inp
+    # $a3 -> filt
+    # $s0 = filter_height = 3
+    # $s1 = filter_width = 3
     # $s2 = out_height
     # $s3 = out_width
     # $s4 = i
     # $s5 = j
-    # $s6 = 4
-    # $s7 = output
+    # $s6 = Output Pointer
+    # $s7 = Array Size
 
+    # init filter hieght and width
     li $s0 3
     li $s1 3
-    li $s6 4
 
-    sub $s2 $a0 $s0 
-    add $s2 $s2 1
+    # int out_height = inp_height - filter_height + 1;
+    sub $s2 $a0 $s0
+    addi $s2 $s2 1
 
-    sub $s3 $a1 $s1 
-    add $s3 $s3 1
+    # int out_width = inp_width - filter_width + 1; 
+    sub $s3 $a1 $s1
+    addi $s3 $s3 1
+    
+    # if(out_height <= 0 || out_width <=0) return;
+    li $s7 0
+    blt $s2 $0 conv2d_return
+    blt $s3 $zero conv2d_return
 
-    ble $s2 $0 conv2d_return
-    ble $s3 $0 conv2d_return
+    # int output[out_height * out_width];
+    multu $s2 $s3
+    mflo $t0
+    move $s7 $t0
+    sll $t0 $t0 2
 
-    mult $s2 $s3
-    mflo $s7
-    mult $s7 $s6
-    mflo $s7
-    sub $sp $sp $s7
-    addiu $sp $sp -4
-    sw $s7 0($sp)
-    move $s7 $sp
-    addiu $s7 $s7 4
+    move $t1 $sp 
+    subu $sp $sp $t0
+        lw $t3 16($t1)
+        sw $t3 16($sp)
+        lw $t3 20($t1)
+        sw $t3 20($sp)
+        lw $t3 24($t1)
+        sw $t3 24($sp)
+        lw $t3 28($t1)
+        sw $t3 28($sp)
+        lw $t3 32($t1)
+        sw $t3 32($sp)
+        lw $t3 36($t1)
+        sw $t3 36($sp)
+        lw $t3 40($t1)
+        sw $t3 40($sp)
+        lw $t3 44($t1)
+        sw $t3 44($sp)
+        lw $t3 48($t1)
+        sw $t3 48($sp)
+        
+    addiu $s6 $sp 56
 
     li $s4 0
     conv2d_loop:
-        bge $s4 $s2 conv2d_print
+        bge $s4 $s2 conv2d_afterLoop
+
         li $s5 0
         conv2d_initArray:
             bge $s5 $s3 conv2d_afterInitArray
 
-            # output[i * out_width + j] = 0
-            mult $s4 $s3 
-            mflo $t0 
+            # $t0 = &output[i * out_width + j] = 0;
+            # $t1 = output[i * out_width + j] = 0;
+            multu $s4 $s3
+            mflo $t0
             add $t0 $t0 $s5
-            mult $t0 $s6
-            mflo $t0 
-            addu $t0 $t0 $s7
+            sll $t0 $t0 2
+            addu $t0 $t0 $s6
             sw $0 0($t0)
 
-            addiu $s5 $s5 1
+            addi $s5 $s5 1
             j conv2d_initArray
         conv2d_afterInitArray:
-            li $s5 0
 
-        conv2d_innerArray:
-            bge $s5 $s0 conv2d_afterLoop
+        li $s5 0
+        conv2d_innnerArray:
+            bge $s5 $s0 conv2d_afterInnerArray
 
             # $t0 = &inp[(i + j) * inp_width]
-            add $t0 $s4 $s5
+            add $t0 $s4 $s5 
             mult $t0 $a1
             mflo $t0
-            mult $t0 $s6
-            mflo $t0
+            sll $t0 $t0 2
             addu $t0 $t0 $a2
-
+            
             # $t1 = &filt[j * 3]
             li $t1 3
             mult $s5 $t1
             mflo $t1
-            mult $t1 $s6
-            mflo $t1
+            sll $t1 $t1 2
             addu $t1 $t1 $a3
 
             # $t2 = &output[i * out_width]
-            mult $s4 $s3 
+            mult $s4 $s3
             mflo $t2
-            mult $t2 $s6
-            mflo $t2
-            addu $t2 $t2 $s7
+            sll $t2 $t2 2
+            addu $t2 $t2 $s6
 
             # $t3 = out_width
-            move $t3 $s3   
+            move $t3 $s3
 
-            addiu $sp $sp -16
-            sw $a0 0($sp)
-            sw $a1 4($sp)
-            sw $a2 8($sp)
-            sw $a3 12($sp)
             move $a0 $t0
             move $a1 $t1
             move $a2 $t2
             move $a3 $t3
+
             jal conv
-            lw $a0 0($sp)
-            lw $a1 4($sp)
-            lw $a2 8($sp)
-            lw $a3 12($sp)
-            addiu $sp $sp 16
-
-            addiu $s5 $s5 1
-            j conv2d_innerArray
-        conv2d_afterLoop:
-            addiu $s4 $s4 1
-            j conv2d_loop
-
-    conv2d_print:
-        li $s4 0 
-        mult $s2 $s3
-        mflo $t0
-        conv2d_printLoop:
-            bge $s4 $t0 conv2d_return
             
-            li $v0 1
-            mult $s6 $s4
-            mflo $a0
-            addu $a0 $a0 $s7
-            lw $a0 0($a0)
-            syscall
-            
-            li $v0 4
-            la $a0 space
-            syscall
+            sll $t0 $s7 2
+            addu $t0 $t0 $sp
+            addiu $t0 $t0 56
+            lw $a0 0($t0)
+            lw $a1 4($t0)
+            lw $a2 8($t0)
+            lw $a3 12($t0)
 
-            addiu $s4 $s4 1
-            j conv2d_printLoop
+            addi $s5 $s5 1
+            j conv2d_innnerArray
+        conv2d_afterInnerArray:
+        
+        addi $s4 $s4 1
+        j conv2d_loop
+    conv2d_afterLoop:
 
-    conv2d_return: 
-        lw $t0 0($sp)
-        addiu $sp $sp 4
-        addu $sp $sp $t0
+    li $s4 0
+    mult $s2 $s3
+    mflo $t0
+    conv2d_printArray:
+        bge $s4 $t0 conv2d_afterPrintArray
+
+        # Print output[i]
+        sll $t1 $s4 2
+        addu $t1 $t1 $s6
+        li $v0 1 
+        lw $a0 0($t1)
+        syscall
+        # Print space
+        li $v0 4
+        la $a0 space
+        syscall
+
+        addiu $s4 $s4 1
+        j conv2d_printArray
+    conv2d_afterPrintArray:
+        
+
+    conv2d_return:
         lw $s0 16($sp)
         lw $s1 20($sp)
         lw $s2 24($sp)
@@ -243,8 +272,18 @@ conv2d:
         lw $s6 40($sp)
         lw $s7 44($sp)
         lw $ra 48($sp)
+        addu $sp $sp $s7
         addiu $sp $sp 56
+        addiu $sp $sp 16
         jr $ra
+
+print:
+    li $v0 1
+    syscall
+    li $v0 11
+    li $a0 10
+    syscall
+    jr $ra
 
 main:
     #Do not modify anything past here!
